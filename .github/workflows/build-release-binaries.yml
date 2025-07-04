@@ -18,42 +18,42 @@ jobs:
             target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
             archive_ext: tar
-          - bin: swap
-            target: armv7-unknown-linux-gnueabihf
-            os: ubuntu-latest
-            archive_ext: tar
-          - bin: swap
-            target: x86_64-apple-darwin
-            os: macos-13
-            archive_ext: tar
-          - bin: swap
-            target: aarch64-apple-darwin
-            os: macos-latest
-            archive_ext: tar
-          - bin: swap
-            target: x86_64-pc-windows-msvc
-            os: windows-latest
-            archive_ext: zip
+          # - bin: swap
+          #   target: armv7-unknown-linux-gnueabihf
+          #   os: ubuntu-latest
+          #   archive_ext: tar
+          # - bin: swap
+          #   target: x86_64-apple-darwin
+          #   os: macos-13
+          #   archive_ext: tar
+          # - bin: swap
+          #   target: aarch64-apple-darwin
+          #   os: macos-latest
+          #   archive_ext: tar
+          # - bin: swap
+          #   target: x86_64-pc-windows-msvc
+          #   os: windows-latest
+          #   archive_ext: zip
           - bin: asb
             target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
             archive_ext: tar
-          - bin: asb
-            target: armv7-unknown-linux-gnueabihf
-            os: ubuntu-latest
-            archive_ext: tar
-          - bin: asb
-            target: x86_64-apple-darwin
-            os: macos-13
-            archive_ext: tar
-          - bin: asb
-            target: aarch64-apple-darwin
-            os: macos-latest
-            archive_ext: tar
-          - bin: asb
-            target: x86_64-pc-windows-msvc
-            os: windows-latest
-            archive_ext: zip
+          # - bin: asb
+          #   target: armv7-unknown-linux-gnueabihf
+          #   os: ubuntu-latest
+          #   archive_ext: tar
+          # - bin: asb
+          #   target: x86_64-apple-darwin
+          #   os: macos-13
+          #   archive_ext: tar
+          # - bin: asb
+          #   target: aarch64-apple-darwin
+          #   os: macos-latest
+          #   archive_ext: tar
+          # - bin: asb
+          #   target: x86_64-pc-windows-msvc
+          #   os: windows-latest
+          #   archive_ext: zip
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout tagged commit
