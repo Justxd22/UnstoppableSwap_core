@@ -7,7 +7,7 @@ on:
 
 env:
 # We build on an older version to support older glib versions
-  UBUNTU: "ubuntu-24.04"
+  UBUNTU: "ubuntu-22.04"
   MACOS_ARM: "macos-latest"
   MACOS_INTEL: "macos-13"
   WINDOWS: "windows-latest"
@@ -59,7 +59,7 @@ jobs:
             args: "--target aarch64-apple-darwin"
           - platform: "macos-13"       # For Intel-based Macs
             args: "--target x86_64-apple-darwin"
-          - platform: "ubuntu-24.04"
+          - platform: "ubuntu-22.04"
             args: ""
           - platform: "windows-latest"
             args: ""

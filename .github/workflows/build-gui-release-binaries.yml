@@ -20,7 +20,9 @@ jobs:
             args: "--target aarch64-apple-darwin"
           - platform: "macos-13" # for Intel based macs.
             args: "--target x86_64-apple-darwin"
-          - platform: "ubuntu-24.04" # We build on an older version to support older glib versions
+          # - platform: "ubuntu-24.04" # We build on an older version to support older glib versions
+            # args: "--bundles deb,appimage"
+          - platform: "ubuntu-22.04" # We build on an older version to support older glib versions
             args: "--bundles deb,appimage"
           - platform: "windows-latest"
             args: ""
@@ -35,7 +37,7 @@ jobs:
         uses: ./.github/actions/set-monero-env
 
       - uses: actionhippie/swap-space@v1
-        if: matrix.platform == env.UBUNTU_PLATFORM_ID
+        if: startsWith(matrix.platform, 'ubuntu')
         with:
           size: 15G
 
@@ -51,17 +53,17 @@ jobs:
           targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
       - name: Configure apt for retries (ubuntu only)
-        if: matrix.platform == env.UBUNTU_PLATFORM_ID
+        if: startsWith(matrix.platform, 'ubuntu')
         run: ${{ env.APT_SET_CONF_COMMAND }}
 
       - name: install dependencies (ubuntu only)
-        if: matrix.platform == env.UBUNTU_PLATFORM_ID # This must match the platform value defined above.
+        if: startsWith(matrix.platform, 'ubuntu') # This must match the platform value defined above.
         run: |
           sudo apt update;
           sudo apt install -y ${{ env.DEPS_MONERO_LINUX }} ${{ env.DEPS_GUI_UBUNTU_SPECIFIC }} git
           
       - name: Get OpenSSL location
-        if: matrix.platform == env.UBUNTU_PLATFORM_ID
+        if: startsWith(matrix.platform, 'ubuntu')
         run: |
           which openssl
           openssl version
