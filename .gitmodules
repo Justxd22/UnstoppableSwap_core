@@ -2,3 +2,6 @@
 	path = monero-sys/monero
 	url = https://github.com/SNeedlewoods/seraphis_wallet.git
 	branch = x_api_add_new_functions_release
+[submodule "monero-sys/boost"]
+	path = monero-sys/boost
+	url = https://github.com/boostorg/boost.git
