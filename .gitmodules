@@ -5,3 +5,9 @@
 [submodule "monero-sys/boost"]
 	path = monero-sys/boost
 	url = https://github.com/boostorg/boost.git
+[submodule "monero-sys/nettle"]
+	path = monero-sys/nettle
+	url = https://git.lysator.liu.se/nettle/nettle.git
+[submodule "monero-sys/unbound"]
+	path = monero-sys/unbound
+	url = https://github.com/NLnetLabs/unbound.git
