@@ -1,6 +1,7 @@
 use cmake::Config;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf}; // Add PathBuf
+use std::process::Command; // Add Command
 
 /// Represents a patch to be applied to the Monero codebase
 struct EmbeddedPatch {
@@ -27,6 +28,142 @@ const EMBEDDED_PATCHES: &[EmbeddedPatch] = &[embedded_patch!(
     "patches/wallet2_api_allow_subtract_from_fee.patch"
 )];
 
+fn build_boost(out_dir: &Path) -> (PathBuf, PathBuf, PathBuf) {
+    let boost_source_path = Path::new("boost");
+    if !boost_source_path.join("bootstrap.sh").exists() {
+        panic!("Boost submodule not found or not initialized! Please run `git submodule update --init --recursive`");
+    }
+
+    let boost_install_path = out_dir.join("boost_install");
+    let boost_lib_path = boost_install_path.join("lib");
+    let boost_include_path = boost_install_path.join("include");
+
+    // If boost is already built, skip. This speeds up rebuilds.
+    if boost_lib_path.exists() {
+        println!("cargo:warning=Found pre-built Boost in output directory, skipping build.");
+        return (boost_install_path, boost_lib_path, boost_include_path);
+    }
+    
+    fs::create_dir_all(&boost_install_path).unwrap();
+
+    // 1. Run bootstrap.sh
+    println!("cargo:warning=Running Boost bootstrap.sh...");
+    let bootstrap_status = Command::new("./bootstrap.sh")
+        .current_dir(&boost_source_path)
+        .status()
+        .expect("Failed to run bootstrap.sh for Boost");
+    assert!(bootstrap_status.success(), "Boost bootstrap.sh failed");
+
+    // 2. Run b2 to build and install the required libraries
+    println!("cargo:warning=Building Boost libraries (this will take a while)...");
+    let b2_status = Command::new("./b2")
+        .current_dir(&boost_source_path)
+        .arg(format!("--prefix={}", boost_install_path.display()))
+        .arg("--with-chrono")
+        .arg("--with-date_time") 
+        .arg("--with-filesystem")
+        .arg("--with-locale")    
+        .arg("--with-program_options") 
+        .arg("--with-serialization")
+        .arg("--with-thread")
+        .arg("link=static") // build static libraries
+        .arg("runtime-link=static") // link the C++ runtime statically
+        .arg("variant=release")
+        .arg("install")
+        .status()
+        .expect("Failed to run b2 for Boost");
+    assert!(b2_status.success(), "Boost b2 build failed");
+
+    println!("cargo:warning=Boost build complete.");
+    (boost_install_path, boost_lib_path, boost_include_path)
+}
+
+
+fn build_nettle(out_dir: &Path) -> PathBuf {
+    let source_path = Path::new("nettle");
+    let install_path = out_dir.join("nettle_install");
+
+    if install_path.join("lib/libnettle.a").exists() {
+        println!("cargo:warning=Found pre-built Nettle, skipping build.");
+        return install_path;
+    }
+
+    // Nettle uses an autotools-style build (./configure, make, make install)
+    if !source_path.join("configure").exists() {
+        println!("cargo:warning=Nettle ./configure not found, running autogen.sh");
+        let status = Command::new("./autogen.sh")
+            .current_dir(&source_path)
+            .status().expect("Failed to run autogen.sh for Nettle");
+        assert!(status.success());
+    }
+
+    println!("cargo:warning=Configuring Nettle...");
+    let status = Command::new("./configure")
+        .current_dir(&source_path)
+        .arg(format!("--prefix={}", install_path.display()))
+        .arg("--enable-static")
+        .arg("--disable-shared")
+        .arg("--disable-documentation")
+        .status().expect("Failed to configure Nettle");
+    assert!(status.success());
+    
+    println!("cargo:warning=Building Nettle...");
+    let status = Command::new("make")
+        .current_dir(&source_path)
+        .arg("-j4") // Use 4 cores
+        .status().expect("Failed to build Nettle");
+    assert!(status.success());
+
+    println!("cargo:warning=Installing Nettle...");
+    let status = Command::new("make")
+        .current_dir(&source_path)
+        .arg("install")
+        .status().expect("Failed to install Nettle");
+    assert!(status.success());
+
+    println!("cargo:warning=Nettle build complete.");
+    install_path
+}
+
+fn build_unbound(out_dir: &Path, nettle_path: &Path) -> PathBuf {
+    let source_path = Path::new("unbound");
+    let install_path = out_dir.join("unbound_install");
+
+    if install_path.join("lib/libunbound.a").exists() {
+        println!("cargo:warning=Found pre-built Unbound, skipping build.");
+        return install_path;
+    }
+    
+    println!("cargo:warning=Configuring Unbound...");
+    let status = Command::new("./configure")
+        .current_dir(&source_path)
+        .arg(format!("--prefix={}", install_path.display()))
+        .arg(format!("--with-nettle={}", nettle_path.display()))
+        .arg("--with-ssl=/usr") // Can use system OpenSSL, it's usually compatible
+        .arg("--enable-static")
+        .arg("--disable-shared")
+        .status().expect("Failed to configure Unbound");
+    assert!(status.success());
+
+    println!("cargo:warning=Building Unbound...");
+    let status = Command::new("make")
+        .current_dir(&source_path)
+        .arg("-j4")
+        .status().expect("Failed to build Unbound");
+    assert!(status.success());
+
+    println!("cargo:warning=Installing Unbound...");
+    let status = Command::new("make")
+        .current_dir(&source_path)
+        .arg("install")
+        .status().expect("Failed to install Unbound");
+    assert!(status.success());
+    
+    println!("cargo:warning=Unbound build complete.");
+    install_path
+}
+
+
 fn main() {
     let is_github_actions: bool = std::env::var("GITHUB_ACTIONS").is_ok();
     let is_docker_build: bool = std::env::var("DOCKER_BUILD").is_ok();
@@ -44,6 +181,18 @@ fn main() {
     // Apply embedded patches before building
     apply_embedded_patches().expect("Failed to apply embedded patches");
 
+    // --- NEW BUILD LOGIC ---
+    let out_dir = PathBuf::from(std::env::var("OUT_DIR").unwrap());
+    
+    // Build our vendored Boost and get the paths to the output
+    let (boost_install_path, boost_lib_path, boost_include_path) = build_boost(&out_dir);
+    let nettle_install_path = build_nettle(&out_dir);
+    let unbound_install_path = build_unbound(&out_dir, &nettle_install_path);
+
+    println!("cargo:rustc-link-search=native={}", boost_lib_path.display());
+    println!("cargo:rustc-link-search=native={}", nettle_install_path.join("lib").display());
+    println!("cargo:rustc-link-search=native={}", unbound_install_path.join("lib").display());
+
     // Build with the monero library all dependencies required
     let mut config = Config::new("monero");
 
@@ -56,8 +205,21 @@ fn main() {
         .define("STATIC", "ON")
         .define("BUILD_SHARED_LIBS", "OFF")
         .define("BUILD_TESTS", "OFF")
+        // .define("Boost_USE_STATIC_LIBS", "ON")
+        // .define("Boost_USE_STATIC_RUNTIME", "ON")
+        .define("BOOST_ROOT", boost_install_path.as_os_str())
+        .define("Boost_LIBRARY_DIR", boost_lib_path.as_os_str())
+        .define("Boost_INCLUDE_DIR", boost_include_path.as_os_str())
         .define("Boost_USE_STATIC_LIBS", "ON")
-        .define("Boost_USE_STATIC_RUNTIME", "ON")
+
+        .define("UNBOUND_ROOT_DIR", unbound_install_path.as_os_str())
+        // This tells Monero to not use the system's libunbound, which
+        // is the component that depends on Nettle. It will use its own.
+        // .define("USE_SYSTEM_UNBOUND", "OFF")
+
+        // As a backup, this explicitly prevents CMake from finding Nettle
+        // on the system, further encouraging it to use its bundled crypto.
+        // .define("CMAKE_DISABLE_FIND_PACKAGE_Nettle", "ON")
         //// Disable support for ALL hardware wallets
         // Disable Trezor support completely
         .define("USE_DEVICE_TREZOR", "OFF")
@@ -262,6 +424,15 @@ fn main() {
     // Link protobuf statically
     println!("cargo:rustc-link-lib=static=protobuf");
 
+    println!("cargo:rustc-link-lib=static=rt"); // Realtime library
+    println!("cargo:rustc-link-lib=static=dl"); // Dynamic linking loader
+    
+    // Add the standard C++ library
+    println!("cargo:rustc-link-lib=stdc++"); // Note: not static=stdc++
+    println!("cargo:rustc-link-lib=static=unbound");
+    println!("cargo:rustc-link-lib=static=nettle");
+    println!("cargo:rustc-link-lib=static=gmp");
+
     #[cfg(target_os = "macos")]
     {
         // Static archive is always present, dylib only on some versions.
@@ -278,6 +449,14 @@ fn main() {
     {
         build.flag_if_supported("-mmacosx-version-min=11.0");
     }
+    // let out_dir = PathBuf::from(std::env::var("OUT_DIR").unwrap());
+    // let boost_include_path = out_dir.join("boost_install").join("include");
+    // let unbound_include_path = unbound_install_path.join("include");
+    // let nettle_include_path = nettle_install_path.join("include");
+
+    let boost_include_path = boost_install_path.join("include");
+    let nettle_include_path = nettle_install_path.join("include");
+    let unbound_include_path = unbound_install_path.join("include");
 
     build
         .flag_if_supported("-std=c++17")
@@ -285,7 +464,10 @@ fn main() {
         .include("monero/src") // Includes the monero headers
         .include("monero/external/easylogging++") // Includes the easylogging++ headers
         .include("monero/contrib/epee/include") // Includes the epee headers for net/http_client.h
-        .include("/opt/homebrew/include") // Homebrew include path for Boost
+        // .include("/opt/homebrew/include") // Homebrew include path for Boost
+        .include(boost_include_path) 
+        .include(unbound_include_path)
+        .include(nettle_include_path)
         .flag("-fPIC"); // Position independent code
 
     #[cfg(target_os = "macos")]
