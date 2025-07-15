@@ -37,7 +37,23 @@ jobs:
         # List extracted files
         echo "Extracted artifacts:"
         find ./artifacts -type f -name "*.deb" -o -name "*.AppImage" | head -20
-        
+
+    - name: Upload asb
+      uses: actions/upload-artifact@v4
+      with:
+        name: asb
+        path: |
+          artifacts/output/asb
+        retention-days: 30
+
+    - name: Upload swap
+      uses: actions/upload-artifact@v4
+      with:
+        name: swap
+        path: |
+          artifacts/output/swap
+        retention-days: 30
+
     - name: Upload .deb packages
       uses: actions/upload-artifact@v4
       with:

@@ -96,9 +96,13 @@ RUN . "$HOME/.cargo/env" \
 # Build the project
 RUN . "$HOME/.cargo/env" \
     && . "$NVM_DIR/nvm.sh" \
+    && cargo build --release --bin=asb \
+    && cargo build --release --bin=swap \
     && cargo tauri build
 
 RUN mkdir -p /output \
+    && cp target/release/asb /output/ \
+    && cp target/release/swap /output/ \
     && cp -r target/release/bundle/deb /output/ \
     && cp -r target/release/bundle/appimage /output/ \
     && ls -la /output/
