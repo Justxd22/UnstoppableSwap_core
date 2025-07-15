@@ -80,10 +80,10 @@ RUN curl https://sh.rustup.rs -sSf | sh -s -- -y \
 WORKDIR /app
 
 # Clone the repository
-RUN git clone https://github.com/Justxd22/UnstoppableSwap_core2
+RUN git clone https://github.com/Justxd22/UnstoppableSwap_core
 
 # Change to the cloned directory
-WORKDIR /app/UnstoppableSwap_core2
+WORKDIR /app/UnstoppableSwap_core
 
 # Initialize and update submodules
 RUN git submodule update --init --recursive
